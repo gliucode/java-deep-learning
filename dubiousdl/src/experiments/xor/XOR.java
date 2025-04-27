@@ -2,12 +2,13 @@ package experiments.xor;
 
 import java.util.Random;
 
-import com.dubiouscandle.dubiousnet.ActivationFunction;
-import com.dubiouscandle.dubiousnet.AdamOptimizer;
-import com.dubiouscandle.dubiousnet.Initializer;
-import com.dubiouscandle.dubiousnet.LossFunction;
-import com.dubiouscandle.dubiousnet.Matrix;
-import com.dubiouscandle.dubiousnet.Model;
+import com.dubiouscandle.dubiousdl.ActivationFunction;
+import com.dubiouscandle.dubiousdl.Adam;
+import com.dubiouscandle.dubiousdl.Batch;
+import com.dubiouscandle.dubiousdl.Initializer;
+import com.dubiouscandle.dubiousdl.LossFunction;
+import com.dubiouscandle.dubiousdl.Matrix;
+import com.dubiouscandle.dubiousdl.Model;
 
 public class XOR {
 	public static void main(String[] args) {
@@ -16,55 +17,44 @@ public class XOR {
 		Random random = new Random(seed);
 
 		Model model = new Model(
-				new ActivationFunction[] { 
-						ActivationFunction.LEAKY_RELU, 
-						ActivationFunction.LEAKY_RELU,
-						ActivationFunction.LEAKY_RELU, 
-						ActivationFunction.IDENTITY,
-				},
-				new int[] { 2, 3, 3, 3, 1 }, 4, new Initializer.XaviarNormal(new Random(random.nextLong())));
+				new ActivationFunction[] { ActivationFunction.LEAKY_RELU, ActivationFunction.LEAKY_RELU,
+						ActivationFunction.LEAKY_RELU, ActivationFunction.IDENTITY, },
+				new int[] { 2, 3, 3, 3, 2 }, 4, new Initializer.XaviarNormal(new Random(random.nextLong())));
 
-		AdamOptimizer op = new AdamOptimizer(model, LossFunction.BINARY_CEL, .9f, .99f);
+		Batch batch = new Batch(new float[][] { { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 }, }, new int[] { 0, 1, 1, 0, }, 4,
+				2, 2, 4, new Random(3));
+		Adam op = new Adam(model, LossFunction.SOFT_MAX_CROSS_ENTROPY_LOSS, .9f, .99f);
 
-		for (int i = 0; i <= 300; i++) {
-			Matrix inputs = new Matrix(2, 4);
-			Matrix targets = new Matrix(1, 4);
+		for (int i = 0; i <= 300_000; i++) {
+		    batch.next();
+		    Matrix input  = batch.input();
+		    Matrix target = batch.target();
 
-			inputs.set(0, 0, 0);
-			inputs.set(1, 0, 0);
-			inputs.set(0, 1, 1);
-			inputs.set(1, 1, 0);
-			inputs.set(0, 2, 0);
-			inputs.set(1, 2, 1);
-			inputs.set(0, 3, 1);
-			inputs.set(1, 3, 1);
+		    op.step(input, target, 0.001f);
 
-			targets.set(0, 0, 0);
-			targets.set(0, 1, 1);
-			targets.set(0, 2, 1);
-			targets.set(0, 3, 0);
+		    if (i % 10_000 == 0) {
+		        Matrix outputs = new Matrix(2, 4);
+		        model.forwardPropagate(input, outputs);
 
-			op.step(inputs, targets, 0.01f);
+		        System.out.println("EPOCH: " + i);
 
-			if (i % 10 == 0) {
-				Matrix outputs = new Matrix(1, 4);
-				model.forwardPropagate(inputs, outputs);
-				System.out.println("EPOCH: " + i);
-				System.out.println("0 ^ 0 = " + sigmoid(outputs.get(0, 0)));
-				System.out.println("1 ^ 0 = " + sigmoid(outputs.get(0, 1)));
-				System.out.println("0 ^ 1 = " + sigmoid(outputs.get(0, 2)));
-				System.out.println("1 ^ 1 = " + sigmoid(outputs.get(0, 3)));
-				float[] output = { outputs.get(0, 0), outputs.get(0, 1), outputs.get(0, 2), outputs.get(0, 3) };
-				float[] target = { 0, 1, 1, 0 };
-				System.out.println("LOSS: " + LossFunction.BINARY_CEL.getLoss(output, target));
-				System.out.println();
-			}
+		        for (int col = 0; col < 4; col++) {
+		            float p0 = outputs.get(0, col), p1 = outputs.get(1, col);
+		            int pred = (p1 > p0 ? 1 : 0);
+		            System.out.printf("%d ^ %d = %d   (p0=%.3f, p1=%.3f)%n",
+		                (int)input.get(0,col),
+		                (int)input.get(1,col),
+		                pred, p0, p1);
+		        }
+
+		        float loss = LossFunction.SOFT_MAX_CROSS_ENTROPY_LOSS.getLoss(outputs, target);
+		        System.out.println("LOSS: " + loss);
+		        System.out.println();
+		    }
 		}
 
 		System.out.println("SEED: " + seed);
-	}
 
-	private static float sigmoid(float x) {
-		return (float) (1.0 / (1.0 + Math.exp(-x)));
+		System.out.println("SEED: " + seed);
 	}
 }

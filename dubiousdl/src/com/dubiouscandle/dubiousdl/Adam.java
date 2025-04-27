@@ -1,6 +1,6 @@
 package com.dubiouscandle.dubiousdl;
 
-public class AdamOptimizer {
+public class Adam {
 	private static final float EPSILON = 1e-5f;
 
 	private final Model model;
@@ -10,7 +10,7 @@ public class AdamOptimizer {
 	private final Matrix[] dz;
 	private final Matrix[] dW;
 	private final Matrix[] db;
-	private final Matrix output;
+	public final Matrix output;
 
 	protected final Matrix[] mW;
 	protected final Matrix[] vW;
@@ -30,7 +30,7 @@ public class AdamOptimizer {
 
 	private int t = 1;
 
-	public AdamOptimizer(Model model, LossFunction J, float B1, float B2) {
+	public Adam(Model model, LossFunction J, float B1, float B2) {
 		this.model = model;
 		this.B1 = B1;
 		this.B2 = B2;
@@ -77,7 +77,7 @@ public class AdamOptimizer {
 		clearCache();
 		model.forwardPropagate(input, output);
 
-		computeError(output, target);
+		J.getError(output, target, dz[L]);
 
 		for (int l = L; l >= 1; l--) {
 			computeBackPropagationStep(l, alpha);
@@ -106,23 +106,6 @@ public class AdamOptimizer {
 		output.clear();
 	}
 
-	private void computeError(Matrix output, Matrix target) {
-		float[] outputArr = new float[model.output_size];
-		float[] targetArr = new float[model.output_size];
-		float[] errorArr = new float[model.output_size];
-
-		for (int i = 0; i < output.cols(); i++) {
-			for (int j = 0; j < output.rows(); j++) {
-				outputArr[j] = output.get(j, i);
-				targetArr[j] = target.get(j, i);
-			}
-			J.getError(outputArr, targetArr, errorArr);
-			for (int j = 0; j < output.rows(); j++) {
-				dz[L].set(j, i, errorArr[j]);
-			}
-		}
-	}
-
 	private void computeBackPropagationStep(int l, float alpha) {
 		if (l != L) {
 			g[l].deriv(Z[l].data(), dz[l].data());
@@ -130,7 +113,7 @@ public class AdamOptimizer {
 		}
 
 		a[l - 1].transpose();
-		Matrix.dot(dz[l], a[l - 1], dW[l]);
+		Matrix.multiply(dz[l], a[l - 1], dW[l]);
 		a[l - 1].transpose();
 		dW[l].multiply(1.0f / model.m);
 
@@ -138,7 +121,7 @@ public class AdamOptimizer {
 		db[l].multiply(1.0f / model.m);
 
 		W[l].transpose();
-		Matrix.dot(W[l], dz[l], da[l - 1]);
+		Matrix.multiply(W[l], dz[l], da[l - 1]);
 		W[l].transpose();
 
 		for (int i = 0; i < mW[l].data().length; i++) {
@@ -157,6 +140,7 @@ public class AdamOptimizer {
 			mW[l].data()[i] = m;
 			vW[l].data()[i] = v;
 		}
+		
 		for (int i = 0; i < mb[l].data().length; i++) {
 			float m = mb[l].data()[i];
 			float v = vb[l].data()[i];

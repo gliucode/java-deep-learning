@@ -6,7 +6,7 @@ public class Batch {
 	private final Random random;
 	private int index;
 
-	private float[][] values;
+	private float[][] embeddings;
 	private int[] labels;
 
 	private Matrix input;
@@ -14,50 +14,58 @@ public class Batch {
 
 	private final int batchSize;
 	private final int numClasses;
+	private final int embeddingSize;
 
-	public Batch(float[][] values, int[] labels, int len, int numClasses, int batchSize, Random random) {
+	public Batch(float[][] embeddings, int[] labels, int len, int numClasses, int embeddingSize, int batchSize,
+			Random random) {
 		this.random = random;
-		this.values = new float[len][];
+		this.embeddingSize = embeddingSize;
+		this.embeddings = new float[len][];
 
 		for (int i = 0; i < len; i++) {
-			this.values[i] = values[i].clone();
-		}
-
-		this.labels = new int[len];
-		System.arraycopy(labels, 0, this.labels, 0, len);
-		for (int label : this.labels) {
-			if (label < 0 || label >= numClasses) {
-				throw new IllegalArgumentException("Label " + label + " out of bounds.");
+			this.embeddings[i] = embeddings[i].clone();
+			if (embeddings[i].length != embeddingSize) {
+				throw new IllegalArgumentException("Invalid embedding.");
 			}
 		}
 
-		input = new Matrix(numClasses, batchSize);
+		this.labels = labels.clone();
+
+		input = new Matrix(embeddingSize, batchSize);
 		target = new Matrix(numClasses, batchSize);
 
 		this.batchSize = batchSize;
 		this.numClasses = numClasses;
+		index = -batchSize;
+		shuffle();
+		next();
 	}
 
 	public void next() {
 		index += batchSize;
 
-		if (index + batchSize > values.length) {
+		if (index + batchSize > embeddings.length) {
 			shuffle();
 			index = 0;
 		}
 
 		for (int i = 0; i < batchSize; i++) {
 			int label = labels[index + i];
+			if (label < 0 || label >= numClasses) {
+				throw new IllegalArgumentException("Label " + label + " out of bounds.");
+			}
 
+			for (int j = 0; j < embeddingSize; j++) {
+				input.set(j, i, embeddings[index + i][j]);
+			}
 			for (int j = 0; j < numClasses; j++) {
-				input.set(i, j, values[index + i][j]);
-				target.set(i, j, j == label ? 1.0f : 0.0f);
+				target.set(j, i, j == label ? 1.0f : 0.0f);
 			}
 		}
 	}
 
 	private void shuffle() {
-		for (int i = values.length - 1; i > 0; i--) {
+		for (int i = embeddings.length - 1; i > 0; i--) {
 			int j = random.nextInt(i + 1);
 
 			swap(i, j);
@@ -65,9 +73,9 @@ public class Batch {
 	}
 
 	private void swap(int i, int j) {
-		float[] tempValue = values[i];
-		values[i] = values[j];
-		values[j] = tempValue;
+		float[] tempValue = embeddings[i];
+		embeddings[i] = embeddings[j];
+		embeddings[j] = tempValue;
 
 		int tempLabel = labels[i];
 		labels[i] = labels[j];

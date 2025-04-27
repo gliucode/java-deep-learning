@@ -1,122 +1,199 @@
 package experiments.digits;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Random;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Shape;
+import java.awt.TextArea;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
+import java.awt.geom.Rectangle2D;
+import java.io.FileInputStream;
+import java.io.ObjectInputStream;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Map.Entry;
 
-import com.dubiouscandle.dubiousnet.Matrix;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+
+import com.dubiouscandle.dubiousdl.ActivationFunction;
+import com.dubiouscandle.dubiousdl.Matrix;
+import com.dubiouscandle.dubiousdl.Model;
 
 public class Digits {
-	private final Random random;
+	static Model model;
+	static DrawPanel drawPanel = new DrawPanel();
+	static TextArea textArea = new TextArea();
 
-	private Matrix input;
-	private Matrix target;
-	private ArrayList<Digit> digitList = new ArrayList<>();
-	private int curIndex = 0;
-	private final int batchSize;
+	public static void main(String[] args) {
+		JFrame frame = new JFrame();
+		textArea.setEditable(true);
+		textArea.setEnabled(true);
+		textArea.setPreferredSize(new Dimension(400, 100));
+		textArea.setBackground(Color.WHITE);
 
-	public Digits(float[][][] digits, int batchSize, Random random) {
-		this.batchSize = batchSize;
-		this.random = random;
-		input = new Matrix(28 * 28, batchSize);
-		target = new Matrix(10, batchSize);
+		frame.add(textArea, BorderLayout.EAST);
+		frame.add(drawPanel, BorderLayout.WEST);
+		frame.pack();
+		frame.setLocationRelativeTo(null);
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		frame.setVisible(true);
 
-		for (int i = 0; i < 10; i++) {
-			for (int j = 0; j < digits[i].length; j++) {
-				float[] digitImage = digits[i][j];
-				int digit = i;
-				digitList.add(new Digit(digitImage, digit));
+		try (FileInputStream fileIn = new FileInputStream("src/experiments/digits/digitrecognizer.ser");
+				ObjectInputStream in = new ObjectInputStream(fileIn)) {
+			model = (Model) in.readObject();
+			model = new Model(model, 1);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		drawPanel.addKeyListener(new KeyAdapter() {
+			public void keyPressed(KeyEvent e) {
+				if (e.getKeyCode() == KeyEvent.VK_R) {
+					for (int i = 0; i < drawPanel.pixels.length; i++) {
+						drawPanel.pixels[i] = 0;
+					}
+					drawPanel.repaint();
+				}
+			}
+		});
+
+		drawPanel.setFocusable(true);
+		drawPanel.requestFocusInWindow();
+	}
+
+	public static void updateRankings() {
+		Matrix tmp1 = new Matrix(28 * 28, 1);
+		Matrix tmp2 = new Matrix(10, 1);
+
+		System.arraycopy(drawPanel.pixels, 0, tmp1.data(), 0, 28 * 28);
+
+		model.forwardPropagate(tmp1, tmp2);
+		float[] out = Arrays.copyOf(tmp2.data(), 10);
+
+		ActivationFunction.softmax(out);
+
+		@SuppressWarnings("unchecked")
+		Entry<Float, Integer>[] entries = new Entry[10];
+		for (int i = 0; i < out.length; i++) {
+			float term = out[i];
+			entries[i] = Map.entry(term, i);
+		}
+		Arrays.sort(entries, (a, b) -> -Float.compare(a.getKey(), b.getKey()));
+
+		StringBuilder text = new StringBuilder();
+		for (Entry<Float, Integer> entry : entries) {
+			text.append(entry.getValue()).append(' ').append(entry.getKey()).append('\n');
+		}
+
+		textArea.setText(text.toString());
+	}
+
+	static float px, py;
+
+	private static class DrawPanel extends JPanel {
+		private float[] pixels = new float[28 * 28];
+
+		DrawPanel() {
+			setBackground(Color.gray);
+
+			setPreferredSize(new Dimension(400, 400));
+
+			addMouseMotionListener(new MouseMotionAdapter() {
+				@Override
+				public void mouseDragged(MouseEvent e) {
+					if (e.getX() >= getWidth() || e.getX() < 0 || e.getY() >= getWidth() || e.getY() < 0) {
+						return;
+					}
+					float y = 28 * (float) e.getX() / getWidth();
+					float x = 28 * (float) e.getY() / getWidth();
+
+					float dist;
+
+					do {
+						dist = (float) Math.hypot(x - px, y - py);
+
+						draw(px, py);
+
+						float nx = (x - px) / dist;
+						float ny = (y - py) / dist;
+
+						px += nx * .3f;
+						py += ny * .3f;
+					} while (dist > .3f);
+
+					draw(x, y);
+					updateRankings();
+					repaint();
+
+					px = x;
+					py = y;
+				}
+			});
+			addMouseListener(new MouseAdapter() {
+				@Override
+				public void mousePressed(MouseEvent e) {
+					drawPanel.requestFocusInWindow();
+					if (e.getX() >= getWidth() || e.getX() < 0 || e.getY() >= getWidth() || e.getY() < 0) {
+						return;
+					}
+
+					float y = 28 * (float) e.getX() / getWidth();
+					float x = 28 * (float) e.getY() / getWidth();
+					draw(x, y);
+					updateRankings();
+					repaint();
+					px = x;
+					py = y;
+				}
+			});
+
+		}
+
+		private void draw(float x, float y) {
+			for (int i = 0; i < 28; i++) {
+				for (int j = 0; j < 28; j++) {
+					float dist = (float) Math.hypot(x - i, y - j);
+					float deltaThickness = 1.0f - dist / 1.7f;
+					if (dist > 1.7f) {
+						deltaThickness = 0;
+					}
+
+					deltaThickness *= 0.2f;
+
+					pixels[28 * i + j] = Math.min(pixels[28 * i + j] + deltaThickness, 1);
+				}
 			}
 		}
 
-		shuffle();
-	}
+		@Override
+		protected void paintComponent(Graphics g) {
+			super.paintComponent(g);
 
-	private void shuffle() {
-		Collections.shuffle(digitList);
+			float w = getWidth() / 28f;
 
-		for (int i = 0; i < digitList.size(); i++) {
-			transform(digitList.get(i).digitImage);
-		}
-	}
+			Graphics2D g2d = (Graphics2D) g;
 
-	private void transform(float[] digitImage) {
-//		float angle = 0;
-		float angle = random.nextFloat(-(float) Math.PI / 6, (float) Math.PI / 6);
+			for (int i = 0; i < 28; i++) {
+				for (int j = 0; j < 28; j++) {
+					float brightness = pixels[i * 28 + j];
+					g2d.setColor(new Color(brightness, brightness, brightness));
 
-		float tx = -5 + random.nextFloat() * 10;
-		float ty = -5 + random.nextFloat() * 10;
-
-		float[] transformedImage = new float[28 * 28];
-		float cosTheta = (float) Math.cos(angle);
-		float sinTheta = (float) Math.sin(angle);
-
-		for (int y = 0; y < 28; y++) {
-			for (int x = 0; x < 28; x++) {
-				float newX = cosTheta * (x - 14) - sinTheta * (y - 14) + 14 + tx;
-				float newY = sinTheta * (x - 14) + cosTheta * (y - 14) + 14 + ty;
-
-				newX = Math.max(0, Math.min(27, newX));
-				newY = Math.max(0, Math.min(27, newY));
-
-				int x1 = (int) newX;
-				int y1 = (int) newY;
-				int x2 = Math.min(27, x1 + 1);
-				int y2 = Math.min(27, y1 + 1);
-
-				float dx = newX - x1;
-				float dy = newY - y1;
-
-				float topLeft = digitImage[y1 * 28 + x1];
-				float topRight = digitImage[y1 * 28 + x2];
-				float bottomLeft = digitImage[y2 * 28 + x1];
-				float bottomRight = digitImage[y2 * 28 + x2];
-
-				float interpolatedValue = (1 - dx) * (1 - dy) * topLeft + dx * (1 - dy) * topRight
-						+ (1 - dx) * dy * bottomLeft + dx * dy * bottomRight;
-
-				transformedImage[y * 28 + x] = interpolatedValue;
+					float x = j * w;
+					float y = i * w;
+					Shape rect = new Rectangle2D.Float(x, y, w, w);
+					g2d.fill(rect);
+				}
 			}
 		}
 
-		System.arraycopy(transformedImage, 0, digitImage, 0, 28 * 28);
-	}
+		private static final long serialVersionUID = 1513754492484967363L;
 
-	public void next() {
-		curIndex += batchSize;
-
-		if (curIndex + batchSize > digitList.size()) {
-			shuffle();
-			curIndex = 0;
-		}
-
-		for (int i = 0; i < batchSize; i++) {
-			Digit digit = digitList.get(curIndex + i);
-
-			for (int j = 0; j < 28 * 28; j++) {
-				input.set(j, i, digit.digitImage[j]);
-			}
-			for (int j = 0; j < 10; j++) {
-				target.set(j, i, digit.digit == j ? 1 : 0);
-			}
-		}
-	}
-
-	public Matrix input() {
-		return input;
-	}
-
-	public Matrix target() {
-		return target;
-	}
-
-	private class Digit {
-		Digit(float[] digitImage, int digit) {
-			this.digitImage = digitImage;
-			this.digit = digit;
-		}
-
-		float[] digitImage;
-		private int digit;
 	}
 }

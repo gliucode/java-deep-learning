@@ -51,12 +51,11 @@ public class Model implements Serializable {
 
 	private void initializeWeights(Initializer initializer) {
 		for (int l = 1; l <= L; l++) {
-			int fan_in = W[L].cols();
-			int fan_out = W[L].rows();
-
-			for (int i = 0; i < W[l].data().length; i++) {
-				W[l].data()[i] = initializer.get(fan_in, fan_out);
-			}
+		    int fan_in  = W[l].cols();
+		    int fan_out = W[l].rows();
+		    for (int i = 0; i < W[l].data().length; i++) {
+		        W[l].data()[i] = initializer.get(fan_in, fan_out);
+		    }
 		}
 	}
 
@@ -76,7 +75,8 @@ public class Model implements Serializable {
 		int n0 = model.a[0].rows();
 		a[0] = new Matrix(n0, m);
 		z[0] = new Matrix(n0, m);
-		b[0] = new Matrix(n0, 1);
+		b[0] = null;
+		W[0] = null;
 
 		for (int l = 1; l <= L; l++) {
 			int n = model.a[l].rows();
@@ -112,7 +112,7 @@ public class Model implements Serializable {
 	 * @param layer
 	 */
 	private void computeForwardPropagationStep(int l) {
-		Matrix.dot(W[l], a[l - 1], z[l]);
+		Matrix.multiply(W[l], a[l - 1], z[l]);
 		z[l].addBroadcasted(b[l]);
 		g[l].get(z[l].data(), a[l].data());
 	}

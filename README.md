@@ -5,3 +5,4 @@ It covers the basics like layers, activations, optimizers, and loss functions in
 
 Hopefully, whether you're learning for the first time or building your deep learning models from scratch, dubious-dl can help you in some way.
 
+Also be warned that there might be mistakes.

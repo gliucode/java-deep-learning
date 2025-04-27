@@ -19,7 +19,7 @@ public class XOR {
 		Model model = new Model(
 				new ActivationFunction[] { ActivationFunction.LEAKY_RELU, ActivationFunction.LEAKY_RELU,
 						ActivationFunction.LEAKY_RELU, ActivationFunction.IDENTITY, },
-				new int[] { 2, 3, 3, 3, 2 }, 4, new Initializer.XaviarNormal(new Random(random.nextLong())));
+				new int[] { 2, 3, 3, 3, 2 }, 4, new Initializer.XavierNormal(new Random(random.nextLong())));
 
 		Batch batch = new Batch(new float[][] { { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 }, }, new int[] { 0, 1, 1, 0, }, 4,
 				2, 2, 4, new Random(3));

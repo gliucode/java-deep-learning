@@ -3,6 +3,7 @@ package experiments.digits;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Shape;
@@ -31,13 +32,16 @@ public class Digits {
 	static DrawPanel drawPanel = new DrawPanel();
 	static TextArea textArea = new TextArea();
 
+	static final int W = 400;
+	
 	public static void main(String[] args) {
-		JFrame frame = new JFrame();
+		JFrame frame = new JFrame("digit thingy");
 		textArea.setEditable(true);
 		textArea.setEnabled(true);
-		textArea.setPreferredSize(new Dimension(400, 100));
+		textArea.setPreferredSize(new Dimension(W, W));
 		textArea.setBackground(Color.WHITE);
-
+		textArea.setFont(new Font("courier new", 0, W / 20));
+		
 		frame.add(textArea, BorderLayout.EAST);
 		frame.add(drawPanel, BorderLayout.WEST);
 		frame.pack();
@@ -89,7 +93,8 @@ public class Digits {
 
 		StringBuilder text = new StringBuilder();
 		for (Entry<Float, Integer> entry : entries) {
-			text.append(entry.getValue()).append(' ').append(entry.getKey()).append('\n');
+
+			text.append(entry.getValue()).append(' ').append(String.format("%1.6f", entry.getKey())).append('\n');
 		}
 
 		textArea.setText(text.toString());
@@ -103,7 +108,7 @@ public class Digits {
 		DrawPanel() {
 			setBackground(Color.gray);
 
-			setPreferredSize(new Dimension(400, 400));
+			setPreferredSize(new Dimension(W, W));
 
 			addMouseMotionListener(new MouseMotionAdapter() {
 				@Override

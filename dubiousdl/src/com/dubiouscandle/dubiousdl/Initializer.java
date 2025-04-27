@@ -5,10 +5,10 @@ import java.util.Random;
 public abstract interface Initializer {
 	float get(int fan_in, int fan_out);
 
-	public static class XaviarUniform implements Initializer {
+	public static class XavierUniform implements Initializer {
 		private Random random;
 
-		public XaviarUniform(Random random) {
+		public XavierUniform(Random random) {
 			this.random = random;
 		}
 
@@ -19,10 +19,10 @@ public abstract interface Initializer {
 		}
 	}
 
-	public static class XaviarNormal implements Initializer {
+	public static class XavierNormal implements Initializer {
 		private Random random;
 
-		public XaviarNormal(Random random) {
+		public XavierNormal(Random random) {
 			this.random = random;
 		}
 
